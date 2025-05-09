@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv8目标检测系统</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .upload-area {
+            width: 500px;
+            height: 200px;
+            border: 2px dashed #ccc;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+        #image-container {
+            position: relative;
+            margin-top: 20px;
+        }
+        #original-image, #result-canvas {
+            max-width: 100%;
+            display: block;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .detection-info {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>目标检测系统</h1>
+
+        <div class="upload-area" id="drop-area">
+            <p>点击或拖拽图片到此处</p>
+            <input type="file" id="file-input" accept="image/*" style="display: none;" />
+            <button class="btn" onclick="document.getElementById('file-input').click()">选择图片</button>
+        </div>
+
+        <button id="detect-btn" class="btn" onclick="detectImage()" disabled>开始检测</button>
+
+        <div id="image-container">
+            <img id="original-image" style="display: none;" />
+            <canvas id="result-canvas"></canvas>
+        </div>
+
+        <div id="results" style="display: none;">
+            <h3>检测结果</h3>
+            <div id="detection-results"></div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let selectedFile = null;
+        const originalImage = document.getElementById('original-image');
+        const resultCanvas = document.getElementById('result-canvas');
+        const ctx = resultCanvas.getContext('2d');
+
+        // 文件选择处理
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                previewImage(selectedFile);
+                document.getElementById('detect-btn').disabled = false;
+            }
+        });
+
+        // 拖拽功能
+        const dropArea = document.getElementById('drop-area');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            dropArea.style.borderColor = '#4CAF50';
+        }
+
+        function unhighlight() {
+            dropArea.style.borderColor = '#ccc';
+        }
+
+        dropArea.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            selectedFile = dt.files[0];
+            if (selectedFile) {
+                previewImage(selectedFile);
+                document.getElementById('detect-btn').disabled = false;
+            }
+        });
+
+        // 预览图片
+        function previewImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                originalImage.src = e.target.result;
+                originalImage.onload = function() {
+                    originalImage.style.display = 'block';
+                    resultCanvas.width = originalImage.naturalWidth;
+                    resultCanvas.height = originalImage.naturalHeight;
+                    ctx.drawImage(originalImage, 0, 0, resultCanvas.width, resultCanvas.height);
+                    resultCanvas.style.display = 'none';
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 检测图片
+        async function detectImage() {
+            if (!selectedFile) return;
+
+            document.getElementById('detect-btn').disabled = true;
+            document.getElementById('detection-results').innerHTML = '<p>检测中...</p>';
+
+            try {
+                resultCanvas.style.display = 'none';
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                const response = await fetch('http://127.0.0.1:8000/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`请求失败: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // 显示结果
+                displayResults(data);
+                // 绘制检测框
+                drawDetectionBoxes(data);
+
+            } catch (error) {
+                console.error('检测出错:', error);
+                document.getElementById('detection-results').innerHTML =
+                    `<p class="error">检测失败: ${error.message}</p>`;
+                document.getElementById('results').style.display = 'block';
+            } finally {
+                document.getElementById('detect-btn').disabled = false;
+            }
+        }
+
+        // 显示检测结果
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('detection-results');
+
+            if (data.error) {
+                resultsDiv.innerHTML = `<p class="error">${data.error}</p>`;
+                document.getElementById('results').style.display = 'block';
+                return;
+            }
+
+            let html = `
+                <div class="detection-info">
+                    <p><strong>检测目标:</strong> ${data.species}</p>
+                    <p><strong>置信度:</strong> ${(data.confidence * 100).toFixed(2)}%</p>
+                    <p><strong>位置坐标:</strong> x1=${data.location[0].toFixed(1)}, y1=${data.location[1].toFixed(1)},
+                    x2=${data.location[2].toFixed(1)}, y2=${data.location[3].toFixed(1)}</p>
+                </div>
+            `;
+
+            resultsDiv.innerHTML = html;
+            document.getElementById('results').style.display = 'block';
+        }
+
+        // 绘制检测框
+        function drawDetectionBoxes(data) {
+            if (!data.location) return;
+
+            // 确保canvas尺寸与图片一致
+            resultCanvas.width = originalImage.naturalWidth;
+            resultCanvas.height = originalImage.naturalHeight;
+
+            // 先绘制原始图片作为背景
+            ctx.drawImage(originalImage, 0, 0, resultCanvas.width, resultCanvas.height);
+
+            // 绘制检测框
+            const [x1, y1, x2, y2] = data.location;
+
+            // 框线设置
+            ctx.strokeStyle = '#FF0000';  // 红色
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+            // 填充半透明底色
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+            ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+
+            // 标签背景
+            const labelText = `${data.species} ${(data.confidence * 100).toFixed(1)}%`;
+            const textWidth = ctx.measureText(labelText).width;
+
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(x1, y1 - 25, textWidth + 10, 25);
+
+            // 标签文字
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '16px Arial';
+            ctx.fillText(labelText, x1 + 5, y1 - 7);
+
+            resultCanvas.style.display = 'block';
+            originalImage.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
