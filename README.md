@@ -33,8 +33,25 @@ cd snake-detection
 python train.py
 ```
 ## 数据集准备
+
 ### 推荐数据集源
+#### 1.Roboflow 数据集来源
+
+本项目使用了来自 **[Roboflow Universe](https://universe.roboflow.com/)** 的以下数据集：
+📌 **数据集名称**: `Vietnamese Snakes Dataset`
+📌 **版本**: `2`
+📌 **任务类型**: **Object Detection (YOLOv8 格式)**
+📌 **许可协议**: **[CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)**（允许商用，需署名）
+📌 **数据集链接**: [Roboflow Vietnamese Snakes Dataset](https://universe.roboflow.com/herping-vietnam/vietnamese-snakes)
+
+**⚠️ 使用要求**：
+
+- **必须** 在 `README.md` 或 `CITATION.md` 中正确 **引用数据集**（格式见下文）。
+- **禁止** 重新分发或用于非法用途（如动物非法贸易分析）。
+- **商业用途** 需要检查Roboflow订阅条款。
+
 1. **Herping Vietnam Snakes** (手动下载)
+   
    ```
    Vietnamese-Snakes/
    ├── images/
