@@ -7,7 +7,7 @@ import uvicorn
 from ultralytics import YOLO
 
 app = FastAPI()
-model = YOLO('yolov8n.pt')  # 加载训练好的模型
+model = YOLO('best.pt')  # 加载训练好的模型
 
 # 添加CORS中间件配置
 app.add_middleware(
