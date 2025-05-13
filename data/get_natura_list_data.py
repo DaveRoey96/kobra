@@ -1,10 +1,13 @@
 import math
 import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Union, Any, List
 
 import pandas as pd
 import requests
+from exceptiongroup import catch
 from pandas import DataFrame
+from requests import exceptions
 from tqdm import tqdm
 
 
@@ -33,7 +36,7 @@ def get_china_snake_species(max_results=100, per_page=20):
                         {
                             "id": obs["taxon"]["id"],
                             "count": obs["count"],
-                            "english_common_name": obs["taxon"]["english_common_name"],  # 英文名称
+                            "english_common_name": obs["taxon"]["name"],  # 英文名称
                             "preferred_common_name": obs["taxon"]["preferred_common_name"],  # 中文名称
                         }
                     )
@@ -70,7 +73,12 @@ def get_obs_img_ids(taxon_id, max_photo=100):
     }
 
     observations = []
-    response = requests.get(base_url, params=params, verify=False).json()
+    try:
+        response = requests.get(base_url, params=params, verify=False).json()
+    except exceptions.RequestException:
+        print("Request failed")
+        return observations
+
     observations.extend(response["results"])
 
     photons = []
@@ -100,24 +108,30 @@ def get_obs_photo_file(photo_id, img_url, save_path):
         print(f"下载失败，HTTP 状态码: {response.status_code}，url: {img_url}")
 
 
+# 创建一个包含5个线程的线程池
+pool = ThreadPoolExecutor(50)
+
 if __name__ == '__main__':
 
     # 下载路径
     base_path = "E:/data/nature"
     image_files = []
     # 获取种类
-    species = get_china_snake_species(10, 5)
+    species = get_china_snake_species(300, 50)
 
     for spec in tqdm(species):
 
         # 获取图片信息
-        photos = get_obs_img_ids(spec["id"], 5)
+        photos = get_obs_img_ids(spec["id"], 300)
         print(f"<spec>{spec['preferred_common_name']},<spec_id>{spec['id']},<phots>{len(photos)}")
 
         # 下载照片
         for photo in photos:
             save_path = os.path.join(base_path, spec["english_common_name"])
-            get_obs_photo_file(photo["photo_id"], photo["url"], save_path)
+
+            # 使用线程池执行任务
+            #results = [pool.submit(get_obs_photo_file, photo["photo_id"], photo["url"], save_path) for i in range(10)]
+
             image_files.append({
                 "class": spec["english_common_name"],
                 "name": spec["preferred_common_name"],
