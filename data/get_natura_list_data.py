@@ -99,7 +99,12 @@ def get_obs_photo_file(photo_id, img_url, save_path):
     id = str(photo_id)
     file_name = os.path.join(save_path, id + ".jpg")
     os.makedirs(os.path.dirname(file_name), exist_ok=True)  # 自动创建目录
-    response = requests.get(img_url, verify=False, stream=True)
+    try:
+        response = requests.get(img_url, verify=False, stream=True)
+    except exceptions.RequestException:
+        print("Request failed")
+        return
+
     if response.status_code == 200:
         with open(file_name, "wb") as file:  # "wb" 以二进制写入
             file.write(response.content)
@@ -125,18 +130,21 @@ if __name__ == '__main__':
         photos = get_obs_img_ids(spec["id"], 300)
         print(f"<spec>{spec['preferred_common_name']},<spec_id>{spec['id']},<phots>{len(photos)}")
 
-        # 下载照片
-        for photo in photos:
-            save_path = os.path.join(base_path, spec["english_common_name"])
+        if len(photos) > 90:
 
-            # 使用线程池执行任务
-            #results = [pool.submit(get_obs_photo_file, photo["photo_id"], photo["url"], save_path) for i in range(10)]
+            # 下载照片
+            for photo in photos:
+                save_path = os.path.join(base_path, spec["english_common_name"])
 
-            image_files.append({
-                "class": spec["english_common_name"],
-                "name": spec["preferred_common_name"],
-                "photo_id": photo["photo_id"],
-            })
+                # 使用线程池执行任务
+                results = [pool.submit(get_obs_photo_file, photo["photo_id"], photo["url"], save_path) for i in
+                           range(10)]
+
+                image_files.append({
+                    "class": spec["english_common_name"],
+                    "name": spec["preferred_common_name"],
+                    "photo_id": photo["photo_id"],
+                })
 
     # 存储为CSV（含图片URL、物种名等信息）
     df = pd.DataFrame(image_files).to_csv(f"{base_path}/data.csv", index=False)
