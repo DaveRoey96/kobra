@@ -1,12 +1,15 @@
+"""
+从 inaturelist 获取中国的蛇类图片，只保留观察图片数量大于90的
+Author: Dave
+Date: 2025-05-14
+"""
+
 import math
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Union, Any, List
 
 import pandas as pd
 import requests
-from exceptiongroup import catch
-from pandas import DataFrame
 from requests import exceptions
 from tqdm import tqdm
 
